@@ -129,5 +129,5 @@ config = {
 }
 
 
-# Scheduler._burySiblings = wrap(Scheduler._burySiblings, buryCousins, 'after')
-# SchedulerV2._burySiblings = wrap(SchedulerV2._burySiblings, buryCousins, 'after')
+Scheduler._burySiblings = wrap(Scheduler._burySiblings, buryCousins, 'after')
+SchedulerV2._burySiblings = wrap(SchedulerV2._burySiblings, buryCousins, 'after')
