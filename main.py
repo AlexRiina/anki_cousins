@@ -1,13 +1,13 @@
-from typing import Iterable, Set, Tuple, TYPE_CHECKING, Union
+from typing import Iterable, Set, List, Tuple, TYPE_CHECKING, Union
 
 import difflib
 
-from anki.consts import QUEUE_TYPE_REV, QUEUE_TYPE_NEW
+from anki.consts import QUEUE_TYPE_REV, QUEUE_TYPE_NEW, QUEUE_TYPE_MANUALLY_BURIED, QUEUE_TYPE_SIBLING_BURIED
 from anki.hooks import wrap
 from anki.schedv2 import Scheduler as SchedulerV2
 from anki.sched import Scheduler
 from anki.notes import Note
-from anki.utils import ids2str
+from anki.utils import ids2str, intTime
 
 SomeScheduler = Union[Scheduler, SchedulerV2]
 
@@ -56,9 +56,24 @@ def buryCousins(self: SomeScheduler, card: 'Card') -> None:
         self.col.log('would be burying %s' % [id for id, _ in cousin_cards])
 
     if isinstance(self, Scheduler):
-        self.buryCards([id for id, _ in cousin_cards])
+        buryCards(self, [id for id, _ in cousin_cards])
     else:
         self.buryCards([id for id, _ in cousin_cards], manual=False)
+
+
+def buryCards(self, cids: List[int], manual: bool = True) -> None:
+    # copied from SchedulerV2.buryCards. Scheduler implements a buryCards, but
+    # it does a bit more than SchedulerV2 which makes the cards repeat for some
+    # reason
+    queue = manual and QUEUE_TYPE_MANUALLY_BURIED or QUEUE_TYPE_SIBLING_BURIED
+    self.col.log(cids)
+    self.col.db.execute(
+        """
+        update cards set queue=?,mod=?,usn=? where id in """ + ids2str(cids),
+        queue,
+        intTime(),
+        self.col.usn(),
+    )
 
 
 def _scheduledNotes(self: SomeScheduler) -> Iterable[Note]:
