@@ -15,5 +15,5 @@ build_test:
 
 test:
 	black --check .
-	flake8 --select=F,E *.py
+	flake8 *.py
 	mypy main.py interface.py
