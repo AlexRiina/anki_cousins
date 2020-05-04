@@ -1,10 +1,10 @@
-.PHONY: clean dist test build build_test
+.PHONY: clean test build build_test
 
-dist:
-	python setup.py sdist --format=zip
+plugin.zip:
+	zip plugin.zip -j -r src
 
 clean:
-	rm -r build dist || true
+	rm -r build dist **/*.egg-info plugin.zip || true
 	pyclean .
 
 build:
