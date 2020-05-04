@@ -54,14 +54,13 @@ def show_settings_dialog() -> None:
     )
 
     match_forms: List[MatchRuleForm] = []
-    print(col.conf.get("anki_cousins", []))
     for stored_values in col.conf.get("anki_cousins", []):
         form = MatchRuleForm(note_types)
 
         try:
             form.set_values(*stored_values)
         except TypeError:
-            col.log("invalid cousin matching config")
+            col.log("invalid cousin matching rule")
             continue
 
         form_grid.appendRow(form.fields)
@@ -77,8 +76,6 @@ def show_settings_dialog() -> None:
     dialog_layout.addLayout(form_grid)
     dialog_layout.addWidget(append)
     dialog_layout.addWidget(buttons)
-
-    print(col.conf.get("anki_cousins"))
 
     if dialog.exec_():
         SettingsManager(col).save(
@@ -196,4 +193,4 @@ class MatchRuleForm:
 
 @partial(addHook, "profileLoaded")
 def profileLoaded():
-    mw.addonManager.setConfigAction("anki_cousins", show_settings_dialog)
+    mw.addonManager.setConfigAction(__name__, show_settings_dialog)

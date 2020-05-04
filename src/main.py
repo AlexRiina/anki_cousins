@@ -11,6 +11,7 @@ from anki.notes import Note
 from anki.sched import Scheduler
 from anki.schedv2 import Scheduler as SchedulerV2
 from anki.utils import ids2str, intTime
+from aqt.utils import tooltip  # type: ignore
 
 from .settings import SettingsManager
 
@@ -36,46 +37,36 @@ def buryCousins(self: SomeScheduler, card: "Card") -> None:
 
     config = SettingsManager(self.col).load()
 
-    print(config)
-
     for rule in config:
-        print("testing rule")
-
         if rule.my_note_model_id != my_note.mid:
-            print("rule doesn't match", repr(rule.my_note_model_id), repr(my_note.mid))
             continue
 
         my_value = field_value(my_note, rule.my_field)
 
         for cousin_note in _scheduledNotes(self):
             if rule.cousin_note_model_id != cousin_note.mid:
-                print("cousin wrong type", rule.cousin_note_model_id, cousin_note.mid)
                 continue
 
             if my_note.id == cousin_note.id:
-                print("skip myself")
                 continue
 
             cousin_value = field_value(cousin_note, rule.cousin_field)
 
             if rule.test(my_value, cousin_value):
-                print("burying")
                 # not super efficient, could just look up cids all at the end
                 toBury.add(cousin_note.id)
-            else:
-                print("not close enough", my_value, cousin_value)
 
     cousin_cards = list(_cousinCards(self, toBury))
 
     for cid, queue in cousin_cards:
         try:
-            self.col.log("would be unscheduling", cid, "from", queue)
             (self._revQueue if queue == QUEUE_TYPE_REV else self._newQueue).remove(cid)
         except ValueError:
-            self.col.log("not currently scheduled", cid, "from", queue)
+            # not actually scheduled. not sure why things end up here but anki
+            # protects against this too
+            pass
 
-    if cousin_cards:
-        self.col.log("would be burying %s" % [id for id, _ in cousin_cards])
+    tooltip("burying %d cousin card" % len(cousin_cards))
 
     if isinstance(self, Scheduler):
         buryCards(self, [id for id, _ in cousin_cards])
