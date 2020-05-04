@@ -15,5 +15,5 @@ build_test:
 
 test:
 	black --check .
-	flake8 *.py
-	mypy main.py interface.py settings.py
+	flake8 src
+	mypy src
