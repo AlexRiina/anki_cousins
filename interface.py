@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Iterable
 from functools import partial
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
@@ -18,6 +18,8 @@ from anki.hooks import addHook
 from anki.collection import _Collection
 from aqt import mw  # type: ignore
 
+from .settings import SettingsManager, MatchRule
+
 
 def show_settings_dialog() -> None:
     col: _Collection = mw.col
@@ -28,7 +30,9 @@ def show_settings_dialog() -> None:
     dialog_layout = QVBoxLayout()
     dialog.setLayout(dialog_layout)
 
-    note_types = {model["name"]: model["id"] for model in col.models.models.values()}
+    note_types = {
+        model["name"]: int(model["id"]) for model in col.models.models.values()
+    }
 
     append = QPushButton("Add rule")
 
@@ -39,15 +43,18 @@ def show_settings_dialog() -> None:
 
     form_grid = FormGrid()
     form_grid.appendRow(
-        QLabel("on note"),
-        QLabel("match field"),
-        QLabel("to note"),
-        QLabel("match field"),
-        QLabel("matcher"),
-        QLabel("similarity"),
+        (
+            QLabel("on note"),
+            QLabel("match field"),
+            QLabel("to note"),
+            QLabel("match field"),
+            QLabel("matcher"),
+            QLabel("similarity"),
+        )
     )
 
-    match_rules: List[MatchRuleForm] = []
+    match_forms: List[MatchRuleForm] = []
+    print(col.conf.get("anki_cousins", []))
     for stored_values in col.conf.get("anki_cousins", []):
         form = MatchRuleForm(note_types)
 
@@ -57,14 +64,15 @@ def show_settings_dialog() -> None:
             col.log("invalid cousin matching config")
             continue
 
-        match_rules.append(form)
+        form_grid.appendRow(form.fields)
+        match_forms.append(form)
 
-    def append_row():
+    def add_new_rule():
         form = MatchRuleForm(note_types)
         form_grid.appendRow(form.fields)
-        match_rules.append(form)
+        match_forms.append(form)
 
-    append.clicked.connect(append_row)
+    append.clicked.connect(add_new_rule)
 
     dialog_layout.addLayout(form_grid)
     dialog_layout.addWidget(append)
@@ -73,18 +81,17 @@ def show_settings_dialog() -> None:
     print(col.conf.get("anki_cousins"))
 
     if dialog.exec_():
-        col.conf["anki_cousins"] = [
-            match_rule.get_values()
-            for match_rule in match_rules
-            if match_rule.is_valid()
-        ]
-
-        mw.checkpoint("Update anki_cousins settings")
-        col.setMod()
+        SettingsManager(col).save(
+            [
+                match_form.make_rule()
+                for match_form in match_forms
+                if match_form.is_valid()
+            ]
+        )
 
 
 class FormGrid(QGridLayout):
-    def appendRow(self, *widgets: QWidget):
+    def appendRow(self, widgets: Iterable[QWidget]):
         row = self.rowCount()
         for col, element in enumerate(widgets):
             self.addWidget(element, row, col)
@@ -162,19 +169,28 @@ class MatchRuleForm:
         if threshold:
             self._threshold.setValue(threshold)
 
-    def get_values(self) -> Tuple:
-        return (
-            self._my_note_type.currentData(),
+    def make_rule(self) -> MatchRule:
+        return MatchRule(
+            int(self._my_note_type.currentData()),
             self._my_note_field.text(),
-            self._other_note_type.currentData(),
+            int(self._other_note_type.currentData()),
             self._other_note_field.text(),
             self._matcher.currentData(),
             self._threshold.value(),
         )
 
     def is_valid(self) -> bool:
-        return not self._delete.isChecked() and all(
-            value not in {None, ""} for value in self.get_values()
+        if self._delete.isChecked():
+            return False
+
+        rule = self.make_rule()
+
+        return (
+            isinstance(rule.my_note_model_id, int)
+            and isinstance(rule.cousin_note_model_id, int)
+            and rule.my_field != ""
+            and rule.cousin_field != ""
+            and rule.threshold > 0
         )
 
 

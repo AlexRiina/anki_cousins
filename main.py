@@ -1,4 +1,3 @@
-import difflib
 from typing import TYPE_CHECKING, Iterable, List, Set, Tuple, Union
 
 from anki.consts import (
@@ -13,6 +12,9 @@ from anki.sched import Scheduler
 from anki.schedv2 import Scheduler as SchedulerV2
 from anki.utils import ids2str, intTime
 
+from .settings import SettingsManager
+
+
 SomeScheduler = Union[Scheduler, SchedulerV2]
 
 if TYPE_CHECKING:
@@ -26,29 +28,42 @@ def buryCousins(self: SomeScheduler, card: "Card") -> None:
     toBury: Set[int] = set()  # note ids
 
     my_note = card.note()
-    my_note_type = card.note_type()
 
     def field_value(note, field_name):
         note_type = self.col.models.get(note.mid)
         field_number = self.col.models.fieldMap(note_type)[field_name][0]
         return note.fields[field_number]
 
-    config = {field: args for field, *args in self.col.conf.get("anki_cousins", [])}
+    config = SettingsManager(self.col).load()
 
-    for my_field, cousin_note_type, cousin_field, comparison, *args in config.get(
-        my_note_type["id"], []
-    ):
-        my_value = field_value(my_note, my_field)
+    print(config)
+
+    for rule in config:
+        print("testing rule")
+
+        if rule.my_note_model_id != my_note.mid:
+            print("rule doesn't match", repr(rule.my_note_model_id), repr(my_note.mid))
+            continue
+
+        my_value = field_value(my_note, rule.my_field)
 
         for cousin_note in _scheduledNotes(self):
-            if my_note.id == cousin_note.id:
+            if rule.cousin_note_model_id != cousin_note.mid:
+                print("cousin wrong type", rule.cousin_note_model_id, cousin_note.mid)
                 continue
 
-            cousin_value = field_value(cousin_note, cousin_field)
+            if my_note.id == cousin_note.id:
+                print("skip myself")
+                continue
 
-            if comparison(my_value, cousin_value, *args):
+            cousin_value = field_value(cousin_note, rule.cousin_field)
+
+            if rule.test(my_value, cousin_value):
+                print("burying")
                 # not super efficient, could just look up cids all at the end
                 toBury.add(cousin_note.id)
+            else:
+                print("not close enough", my_value, cousin_value)
 
     cousin_cards = list(_cousinCards(self, toBury))
 
@@ -105,28 +120,6 @@ def _cousinCards(self: SomeScheduler, note_ids: Set[int]) -> Iterable[Tuple[int,
     and (queue={QUEUE_TYPE_NEW} or (queue={QUEUE_TYPE_REV} and due<=?))""",
         self.today,
     )  # type: ignore
-
-
-def _commonPrefixTest(a: str, b: str, percent_match: float) -> bool:
-    # don't accidentally run on empty cards. rather be safe
-    if max(len(a), len(b)) < 5:
-        return False
-
-    for i, (al, bl) in enumerate(zip(a, b)):
-        if al != bl:
-            break
-    else:
-        i = i + 1
-
-    return i > percent_match * max(len(a), len(b))
-
-
-def _similarityTest(a: str, b: str, percent_match: float) -> bool:
-    # don't accidentally run on empty cards. rather be safe
-    if max(len(a), len(b)) < 5:
-        return False
-
-    return difflib.SequenceMatcher(None, a, b).ratio() > percent_match
 
 
 # Anki doesn't have hooks in all of the right places, so monkey patching
