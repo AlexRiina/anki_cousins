@@ -7,12 +7,12 @@ from PyQt5.QtWidgets import (
     QDialogButtonBox,
     QGridLayout,
     QVBoxLayout,
-    QFormLayout,
     QComboBox,
     QCheckBox,
     QDoubleSpinBox,
     QLineEdit,
     QLabel,
+    QWidget,
 )
 from anki.hooks import addHook
 from anki.collection import _Collection
@@ -30,8 +30,6 @@ def show_settings_dialog() -> None:
 
     note_types = {model["name"]: model["id"] for model in col.models.models.values()}
 
-    forms = QVBoxLayout()
-
     append = QPushButton('Add rule')
 
     buttons = QDialogButtonBox(QDialogButtonBox.Close | QDialogButtonBox.Save)  # type: ignore
@@ -39,20 +37,17 @@ def show_settings_dialog() -> None:
     buttons.rejected.connect(dialog.reject)
     buttons.setOrientation(Qt.Horizontal)
 
-    grid = QGridLayout()
-
-    for index, label in enumerate([
-            QLabel("on note"),
-            QLabel("match field"),
-            QLabel("to note"),
-            QLabel("match field"),
-            QLabel("matcher"),
-            QLabel("similarity")]):
-        grid.addWidget(label, 0, index)
+    form_grid = FormGrid([
+        QLabel("on note"),
+        QLabel("match field"),
+        QLabel("to note"),
+        QLabel("match field"),
+        QLabel("matcher"),
+        QLabel("similarity")])
 
     match_rules: List[MatchRuleForm] = []
     for stored_values in col.conf.get('anki_cousins', []):
-        form = MatchRuleForm(note_types, grid)
+        form = MatchRuleForm(note_types)
 
         try:
             form.set_values(*stored_values)
@@ -60,25 +55,16 @@ def show_settings_dialog() -> None:
             col.log("invalid cousin matching config")
             continue
 
-        if grid:
-            pass
-        else:
-            forms.addLayout(form.layout)
         match_rules.append(form)
 
     def append_row():
-        form = MatchRuleForm(note_types, grid)
-        if grid:
-            pass
-        else:
-            forms.addLayout(form.layout)
+        form = MatchRuleForm(note_types)
+        form_grid.append_row(form.fields)
         match_rules.append(form)
 
     append.clicked.connect(append_row)
 
-    dialog_layout.addLayout(forms)
-    if grid:
-        dialog_layout.addLayout(grid)
+    dialog_layout.addLayout(form_grid)
     dialog_layout.addWidget(append)
     dialog_layout.addWidget(buttons)
 
@@ -90,10 +76,19 @@ def show_settings_dialog() -> None:
         col.setMod()
 
 
-class MatchRuleForm:
-    layout: QFormLayout
+class FormGrid(QGridLayout):
+    def __init__(self, headers):
+        self.layout = QGridLayout()
+        self.append_row(headers)
 
-    def __init__(self, note_types, grid):
+    def append_row(self, *row):
+        row = self.layout.rowCount()
+        for index, element in row:
+            self.layout.addWidget(element, row, index)
+
+
+class MatchRuleForm:
+    def __init__(self, note_types):
         self._my_note_type = QComboBox()
         for note_type, note_id in note_types.items():
             self._my_note_type.addItem(note_type, note_id)
@@ -120,26 +115,17 @@ class MatchRuleForm:
 
         self._delete = QCheckBox('delete?')
 
-        if False:
-            self.layout = QFormLayout()
-            self.layout.addRow(QLabel("on note"), self._my_note_type)
-            self.layout.addRow(QLabel("match field"), self._my_note_field)
-            self.layout.addRow(QLabel("to note"), self._other_note_type)
-            self.layout.addRow(QLabel("match field"), self._other_note_field)
-            self.layout.addRow(QLabel("matcher"), self._matcher)
-            self.layout.addRow(QLabel("similarity threshold"), self._threshold)
-            self.layout.addRow(self._delete)
-        else:
-            row = grid.rowCount()
-
-            for index, field in enumerate([self._my_note_type,
-                                           self._my_note_field,
-                                           self._other_note_type,
-                                           self._other_note_field,
-                                           self._matcher,
-                                           self._threshold,
-                                           self._delete]):
-                grid.addWidget(field, row, index)
+    @property
+    def fields(self) -> List[QWidget]:
+        return [
+            self._my_note_type,
+            self._my_note_field,
+            self._other_note_type,
+            self._other_note_field,
+            self._matcher,
+            self._threshold,
+            self._delete,
+        ]
 
     def set_values(self,
                    my_note_type_value,

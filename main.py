@@ -33,6 +33,8 @@ def buryCousins(self: SomeScheduler, card: "Card") -> None:
         field_number = self.col.models.fieldMap(note_type)[field_name][0]
         return note.fields[field_number]
 
+    config = {field: args for field, *args in self.col.conf.get("anki_cousins", [])}
+
     for my_field, cousin_note_type, cousin_field, comparison, *args in config.get(
         my_note_type["id"], []
     ):
@@ -125,18 +127,6 @@ def _similarityTest(a: str, b: str, percent_match: float) -> bool:
         return False
 
     return difflib.SequenceMatcher(None, a, b).ratio() > percent_match
-
-
-# BASIC = 1422596230240
-BASIC = "1588463978525"
-
-# { note type: [(field, other note type, other field)] }
-config = {
-    BASIC: [
-        ("Back", BASIC, "Back", _commonPrefixTest, 0.5),
-        ("Back", BASIC, "Back", _similarityTest, 0.5),
-    ]
-}
 
 
 # Anki doesn't have hooks in all of the right places, so monkey patching
