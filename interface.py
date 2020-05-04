@@ -30,23 +30,26 @@ def show_settings_dialog() -> None:
 
     note_types = {model["name"]: model["id"] for model in col.models.models.values()}
 
-    append = QPushButton('Add rule')
+    append = QPushButton("Add rule")
 
     buttons = QDialogButtonBox(QDialogButtonBox.Close | QDialogButtonBox.Save)  # type: ignore
     buttons.accepted.connect(dialog.accept)
     buttons.rejected.connect(dialog.reject)
     buttons.setOrientation(Qt.Horizontal)
 
-    form_grid = FormGrid([
-        QLabel("on note"),
-        QLabel("match field"),
-        QLabel("to note"),
-        QLabel("match field"),
-        QLabel("matcher"),
-        QLabel("similarity")])
+    form_grid = FormGrid(
+        [
+            QLabel("on note"),
+            QLabel("match field"),
+            QLabel("to note"),
+            QLabel("match field"),
+            QLabel("matcher"),
+            QLabel("similarity"),
+        ]
+    )
 
     match_rules: List[MatchRuleForm] = []
-    for stored_values in col.conf.get('anki_cousins', []):
+    for stored_values in col.conf.get("anki_cousins", []):
         form = MatchRuleForm(note_types)
 
         try:
@@ -68,11 +71,14 @@ def show_settings_dialog() -> None:
     dialog_layout.addWidget(append)
     dialog_layout.addWidget(buttons)
 
-    print(col.conf.get('anki_cousins'))
+    print(col.conf.get("anki_cousins"))
 
     if dialog.exec_():
-        col.conf['anki_cousins'] = [match_rule.get_values() for match_rule in
-                                    match_rules if match_rule.is_valid()]
+        col.conf["anki_cousins"] = [
+            match_rule.get_values()
+            for match_rule in match_rules
+            if match_rule.is_valid()
+        ]
         col.setMod()
 
 
@@ -113,7 +119,7 @@ class MatchRuleForm:
         self._threshold.setSingleStep(0.05)
         self._threshold.setValue(0.95)
 
-        self._delete = QCheckBox('delete?')
+        self._delete = QCheckBox("delete?")
 
     @property
     def fields(self) -> List[QWidget]:
@@ -127,24 +133,28 @@ class MatchRuleForm:
             self._delete,
         ]
 
-    def set_values(self,
-                   my_note_type_value,
-                   my_note_field_value,
-                   other_note_type_value,
-                   other_note_field_value,
-                   matcher,
-                   threshold,
-                   ):
+    def set_values(
+        self,
+        my_note_type_value,
+        my_note_field_value,
+        other_note_type_value,
+        other_note_field_value,
+        matcher,
+        threshold,
+    ):
 
         if my_note_type_value:
-            self._my_note_type.setCurrentIndex(self._my_note_type.findData(my_note_type_value))
+            self._my_note_type.setCurrentIndex(
+                self._my_note_type.findData(my_note_type_value)
+            )
 
         if my_note_field_value:
             self._my_note_field.setText(my_note_field_value)
 
         if other_note_type_value:
             self._other_note_type.setCurrentIndex(
-                self._other_note_type.findData(other_note_type_value))
+                self._other_note_type.findData(other_note_type_value)
+            )
 
         if other_note_field_value:
             self._other_note_field.setText(other_note_field_value)
@@ -166,8 +176,9 @@ class MatchRuleForm:
         )
 
     def is_valid(self):
-        return not self._delete.isChecked() and \
-            all(value not in {None, ""} for value in self.get_values())
+        return not self._delete.isChecked() and all(
+            value not in {None, ""} for value in self.get_values()
+        )
 
 
 @partial(addHook, "profileLoaded")

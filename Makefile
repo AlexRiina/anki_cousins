@@ -4,8 +4,7 @@ dist:
 	python setup.py sdist --format=zip
 
 clean:
-	rm -r build
-	rm -r dist
+	rm -r build dist || true
 	pyclean .
 
 build:
@@ -16,5 +15,5 @@ build_test:
 
 test:
 	black --check .
-	flake8 --select=F,E .
-	mypy main.py
+	flake8 --select=F,E *.py
+	mypy main.py interface.py
