@@ -86,7 +86,7 @@ def show_settings_dialog() -> None:
 class FormGrid(QGridLayout):
     def appendRow(self, *widgets: QWidget):
         row = self.rowCount()
-        for col, element in widgets:
+        for col, element in enumerate(widgets):
             self.addWidget(element, row, col)
 
 
