@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 from functools import partial
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
@@ -37,15 +37,14 @@ def show_settings_dialog() -> None:
     buttons.rejected.connect(dialog.reject)
     buttons.setOrientation(Qt.Horizontal)
 
-    form_grid = FormGrid(
-        [
-            QLabel("on note"),
-            QLabel("match field"),
-            QLabel("to note"),
-            QLabel("match field"),
-            QLabel("matcher"),
-            QLabel("similarity"),
-        ]
+    form_grid = FormGrid()
+    form_grid.appendRow(
+        QLabel("on note"),
+        QLabel("match field"),
+        QLabel("to note"),
+        QLabel("match field"),
+        QLabel("matcher"),
+        QLabel("similarity"),
     )
 
     match_rules: List[MatchRuleForm] = []
@@ -62,7 +61,7 @@ def show_settings_dialog() -> None:
 
     def append_row():
         form = MatchRuleForm(note_types)
-        form_grid.append_row(form.fields)
+        form_grid.appendRow(form.fields)
         match_rules.append(form)
 
     append.clicked.connect(append_row)
@@ -79,22 +78,20 @@ def show_settings_dialog() -> None:
             for match_rule in match_rules
             if match_rule.is_valid()
         ]
+
+        mw.checkpoint("Update anki_cousins settings")
         col.setMod()
 
 
 class FormGrid(QGridLayout):
-    def __init__(self, headers):
-        self.layout = QGridLayout()
-        self.append_row(headers)
-
-    def append_row(self, *row):
-        row = self.layout.rowCount()
-        for index, element in row:
-            self.layout.addWidget(element, row, index)
+    def appendRow(self, *widgets: QWidget):
+        row = self.rowCount()
+        for col, element in widgets:
+            self.addWidget(element, row, col)
 
 
 class MatchRuleForm:
-    def __init__(self, note_types):
+    def __init__(self, note_types) -> None:
         self._my_note_type = QComboBox()
         for note_type, note_id in note_types.items():
             self._my_note_type.addItem(note_type, note_id)
@@ -165,7 +162,7 @@ class MatchRuleForm:
         if threshold:
             self._threshold.setValue(threshold)
 
-    def get_values(self):
+    def get_values(self) -> Tuple:
         return (
             self._my_note_type.currentData(),
             self._my_note_field.text(),
@@ -175,7 +172,7 @@ class MatchRuleForm:
             self._threshold.value(),
         )
 
-    def is_valid(self):
+    def is_valid(self) -> bool:
         return not self._delete.isChecked() and all(
             value not in {None, ""} for value in self.get_values()
         )
