@@ -66,7 +66,8 @@ def buryCousins(self: SomeScheduler, card: "Card") -> None:
             # protects against this too
             pass
 
-    tooltip("burying %d cousin card" % len(cousin_cards))
+    if cousin_cards:
+        tooltip("burying %d cousin card" % len(cousin_cards))
 
     if isinstance(self, Scheduler):
         buryCards(self, [id for id, _ in cousin_cards])
