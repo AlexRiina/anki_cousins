@@ -46,7 +46,10 @@ class SettingsManager:
 
     def save(self, match_rules: Iterable[MatchRule]):
         self.col.conf[self.key] = sorted(
-            [list(self._serialize_rule(match_rule).values()) for match_rule in match_rules]
+            [
+                list(self._serialize_rule(match_rule).values())
+                for match_rule in match_rules
+            ]
         )
 
         self.col.setMod()
@@ -54,13 +57,13 @@ class SettingsManager:
     @staticmethod
     def _deserialize_rule(stored: List[Serializeable]) -> MatchRule:
         rule_dict = dict(zip(MatchRule._fields, stored))
-        comparison = Comparisons[rule_dict.pop('comparison')]  # type: ignore
+        comparison = Comparisons[rule_dict.pop("comparison")]  # type: ignore
         return MatchRule(comparison=comparison, **rule_dict)  # type: ignore
 
     @staticmethod
     def _serialize_rule(rule: MatchRule) -> Dict[str, Serializeable]:
         rule_dict = rule._asdict()
-        rule_dict['comparison'] = rule.comparison.name
+        rule_dict["comparison"] = rule.comparison.name
         return rule_dict
 
 
