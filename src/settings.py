@@ -1,5 +1,16 @@
-from typing import NamedTuple, Iterable, List
+from typing import NamedTuple, Iterable, List, Dict, Union
+import enum
 import difflib
+
+
+Serializeable = Union[int, str, float]
+
+
+class Comparisons(enum.Enum):
+    similarity = 1
+    prefix = 2
+    contains = 3
+    contained_by = 4
 
 
 class MatchRule(NamedTuple):
@@ -7,13 +18,15 @@ class MatchRule(NamedTuple):
     my_field: str
     cousin_note_model_id: int
     cousin_field: str
-    comparison: str
+    comparison: Comparisons
     threshold: float
 
     def test(self, a: str, b: str) -> bool:
-        if self.comparison == "similarity":
+        comparison = self.comparison
+
+        if comparison == Comparisons.similarity:
             return _similarityTest(a, b, self.threshold)
-        elif self.comparison == "prefix":
+        elif comparison == Comparisons.prefix:
             return _commonPrefixTest(a, b, self.threshold)
         raise ValueError("unrecognized comparison test")
 
@@ -25,14 +38,26 @@ class SettingsManager:
         self.col = col
 
     def load(self) -> List[MatchRule]:
-        return [MatchRule._make(row) for row in self.col.conf.get(self.key, [])]
+        return [self._deserialize_rule(row) for row in self.col.conf.get(self.key, [])]
 
     def save(self, match_rules: Iterable[MatchRule]):
         self.col.conf[self.key] = sorted(
-            [list(match_rule._asdict().values()) for match_rule in match_rules]
+            [list(self._serialize_rule(match_rule).values()) for match_rule in match_rules]
         )
 
         self.col.setMod()
+
+    @staticmethod
+    def _deserialize_rule(stored: List[Serializeable]) -> MatchRule:
+        rule_dict = dict(zip(MatchRule._fields, stored))
+        comparison = Comparisons[rule_dict.pop('comparison')]  # type: ignore
+        return MatchRule(comparison=comparison, **rule_dict)  # type: ignore
+
+    @staticmethod
+    def _serialize_rule(rule: MatchRule) -> Dict[str, Serializeable]:
+        rule_dict = rule._asdict()
+        rule_dict['comparison'] = rule.comparison.name
+        return rule_dict
 
 
 def _commonPrefixTest(a: str, b: str, percent_match: float) -> bool:

@@ -18,7 +18,7 @@ from anki.hooks import addHook
 from anki.collection import _Collection
 from aqt import mw  # type: ignore
 
-from .settings import SettingsManager, MatchRule
+from .settings import SettingsManager, MatchRule, Comparisons
 
 
 def show_settings_dialog() -> None:
@@ -54,11 +54,11 @@ def show_settings_dialog() -> None:
     )
 
     match_forms: List[MatchRuleForm] = []
-    for stored_values in col.conf.get("anki_cousins", []):
+    for rule in SettingsManager(col).load():
         form = MatchRuleForm(note_types)
 
         try:
-            form.set_values(*stored_values)
+            form.set_values(rule)
         except TypeError:
             col.log("invalid cousin matching rule")
             continue
@@ -111,8 +111,8 @@ class MatchRuleForm:
         self._other_note_field = QLineEdit()
 
         self._matcher = QComboBox()
-        self._matcher.addItem("by prefix", "prefix")
-        self._matcher.addItem("by similarity", "similarity")
+        self._matcher.addItem("by prefix", Comparisons.prefix)
+        self._matcher.addItem("by similarity", Comparisons.similarity)
 
         self._threshold = QDoubleSpinBox()
         self._threshold.setMinimum(0)
@@ -134,37 +134,28 @@ class MatchRuleForm:
             self._delete,
         ]
 
-    def set_values(
-        self,
-        my_note_type_value,
-        my_note_field_value,
-        other_note_type_value,
-        other_note_field_value,
-        matcher,
-        threshold,
-    ):
-
-        if my_note_type_value:
+    def set_values(self, rule: MatchRule) -> None:
+        if rule.my_note_model_id:
             self._my_note_type.setCurrentIndex(
-                self._my_note_type.findData(my_note_type_value)
+                self._my_note_type.findData(rule.my_note_model_id)
             )
 
-        if my_note_field_value:
-            self._my_note_field.setText(my_note_field_value)
+        if rule.my_field:
+            self._my_note_field.setText(rule.my_field)
 
-        if other_note_type_value:
+        if rule.cousin_note_model_id:
             self._other_note_type.setCurrentIndex(
-                self._other_note_type.findData(other_note_type_value)
+                self._other_note_type.findData(rule.cousin_note_model_id)
             )
 
-        if other_note_field_value:
-            self._other_note_field.setText(other_note_field_value)
+        if rule.cousin_field:
+            self._other_note_field.setText(rule.cousin_field)
 
-        if matcher:
-            self._matcher.setCurrentIndex(self._matcher.findData(matcher))
+        if rule.comparison:
+            self._matcher.setCurrentIndex(self._matcher.findData(rule.comparison))
 
-        if threshold:
-            self._threshold.setValue(threshold)
+        if rule.threshold:
+            self._threshold.setValue(rule.threshold)
 
     def make_rule(self) -> MatchRule:
         return MatchRule(
