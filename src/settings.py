@@ -28,6 +28,10 @@ class MatchRule(NamedTuple):
             return _similarityTest(a, b, self.threshold)
         elif comparison == Comparisons.prefix:
             return _commonPrefixTest(a, b, self.threshold)
+        elif comparison == Comparisons.contains:
+            return _contains(a, b, self.threshold)
+        elif comparison == Comparisons.contained_by:
+            return _contained_by(a, b, self.threshold)
         raise ValueError("unrecognized comparison test")
 
 
@@ -80,3 +84,11 @@ def _similarityTest(a: str, b: str, percent_match: float) -> bool:
         return False
 
     return difflib.SequenceMatcher(None, a, b).ratio() > percent_match
+
+
+def _contained_by(a: str, b: str, threshold: float):
+    return a in b
+
+
+def _contains(a: str, b: str, threshold: float):
+    return _contained_by(b, a, threshold)
