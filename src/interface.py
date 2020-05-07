@@ -113,6 +113,11 @@ class MatchRuleForm:
         self._matcher = QComboBox()
         self._matcher.addItem("by prefix", Comparisons.prefix)
         self._matcher.addItem("by similarity", Comparisons.similarity)
+        self._matcher.addItem("contains", Comparisons.contains)
+        self._matcher.addItem("contained by", Comparisons.contained_by)
+        self._matcher.addItem(
+            "cloze answers contained by", Comparisons.cloze_contained_by
+        )
 
         self._threshold = QDoubleSpinBox()
         self._threshold.setMinimum(0)
