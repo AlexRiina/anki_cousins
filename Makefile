@@ -17,3 +17,4 @@ test:
 	black --check .
 	flake8 src
 	mypy src
+	python -m doctest src/settings.py

@@ -1,4 +1,6 @@
+import re
 from typing import NamedTuple, Iterable, List, Dict, Union
+from functools import lru_cache
 import enum
 import difflib
 
@@ -11,6 +13,7 @@ class Comparisons(enum.Enum):
     prefix = 2
     contains = 3
     contained_by = 4
+    cloze_contained_by = 5
 
 
 class MatchRule(NamedTuple):
@@ -32,6 +35,8 @@ class MatchRule(NamedTuple):
             return _contains(a, b, self.threshold)
         elif comparison == Comparisons.contained_by:
             return _contained_by(a, b, self.threshold)
+        elif comparison == Comparisons.cloze_contained_by:
+            return _cloze_contained_by()(a, b, self.threshold)
         raise ValueError("unrecognized comparison test")
 
 
@@ -95,3 +100,30 @@ def _contained_by(a: str, b: str, threshold: float):
 
 def _contains(a: str, b: str, threshold: float):
     return _contained_by(b, a, threshold)
+
+
+class _cloze_contained_by:
+    """ terms in cloze deletion a contained anywhere in b
+
+    >>> _cloze_contained_by()('{{c1::hi}}', 'test hi test', 1)
+    True
+
+    >>> _cloze_contained_by()('{{c1::hi::greeting}}', 'test hi test', 1)
+    True
+
+    >>> _cloze_contained_by()('{{c1::hi}}', 'bye', 1)
+    False
+    """
+
+    def __call__(self, a: str, b: str, threshold: float):
+        return any(cloze_answer in b for cloze_answer in self._extra_answers(a))
+
+    @classmethod
+    @lru_cache
+    def _extra_answers(self, a: str) -> List[str]:
+        # locally cached so for each a vs b comparison we don't re-extract
+        # answers from a
+        return [
+            match.group("answer")
+            for match in re.finditer(r"{{(?P<group>.*?)::(?P<answer>.*?)(::.*?)?}}", a)
+        ]
