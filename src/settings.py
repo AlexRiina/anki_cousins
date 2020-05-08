@@ -74,7 +74,7 @@ class SettingsManager:
 
 def _commonPrefixTest(a: str, b: str, percent_match: float) -> bool:
     # don't accidentally run on empty cards. rather be safe
-    if max(len(a), len(b)) < 5:
+    if min(len(a), len(b)) < 4:
         return False
 
     for i, (al, bl) in enumerate(zip(a, b)):
@@ -87,15 +87,25 @@ def _commonPrefixTest(a: str, b: str, percent_match: float) -> bool:
 
 
 def _similarityTest(a: str, b: str, percent_match: float) -> bool:
+    """
+    >>> _similarityTest('xxxyyy', 'xxyxyy', 0.8)
+    True
+
+    >>> _similarityTest('xxxyyy', 'xxyxyy', 0.9)
+    False
+
+    >>> _similarityTest('hello', 'hello this is a test', 0.5)
+    False
+    """
     # don't accidentally run on empty cards. rather be safe
-    if max(len(a), len(b)) < 5:
+    if max(len(a), len(b)) < 4:
         return False
 
     return difflib.SequenceMatcher(None, a, b).ratio() > percent_match
 
 
 def _contained_by(a: str, b: str, threshold: float):
-    return a in b
+    return len(a) > 3 and a in b
 
 
 def _contains(a: str, b: str, threshold: float):
