@@ -105,25 +105,30 @@ def _contains(a: str, b: str, threshold: float):
 class _cloze_contained_by:
     """ terms in cloze deletion a contained anywhere in b
 
-    >>> _cloze_contained_by()('{{c1::hi}}', 'test hi test', 1)
+    >>> _cloze_contained_by()('{{c1::hello}}', 'test hello test', 1)
     True
 
-    >>> _cloze_contained_by()('{{c1::hi::greeting}}', 'test hi test', 1)
+    >>> _cloze_contained_by()('{{c1::hello::greeting}}', 'test hello test', 1)
     True
 
-    >>> _cloze_contained_by()('{{c1::hi}}', 'bye', 1)
+    >>> _cloze_contained_by()('{{c1::hello}}', 'bye', 1)
+    False
+
+    >>> _cloze_contained_by()('Phase {{c1::2::#N}} clinical trial', '2 x 2', 1)
     False
     """
 
     def __call__(self, a: str, b: str, threshold: float):
-        return any(cloze_answer in b for cloze_answer in self._extra_answers(a))
+        return any(cloze_answer.search(b) for cloze_answer in self._extra_answers(a))
 
     @classmethod
     @lru_cache
-    def _extra_answers(self, a: str) -> List[str]:
+    def _extra_answers(self, a: str) -> List[re.Pattern]:
         # locally cached so for each a vs b comparison we don't re-extract
         # answers from a
         return [
-            match.group("answer")
+            re.compile(r"\b{}\b".format(re.escape(match.group("answer"))))
             for match in re.finditer(r"{{(?P<group>.*?)::(?P<answer>.*?)(::.*?)?}}", a)
+            # don't accidentally suppress on concepts like "2"
+            if len(match.group("answer")) > 3
         ]
