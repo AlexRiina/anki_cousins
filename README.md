@@ -47,6 +47,16 @@ break surrounding the answer to protect against some common cases like testing
 the spanish article for water with `{{c1::el::el / la}} agua` from suppressing
 all cards containing `el`.
 
+# Development
+
+The easiest way to work on this locally is to clone this repo and symlink the
+src folder into your anki plugins. For me, that can be done by
+
+```sh
+git clone git@github.com:AlexRiina/anki_cousins.git
+ln -s -t ~/.local/share/Anki2/addons21 `pwd`/anki_couins/src
+```
+
 # Testing
 
 Anki's a bit tough to test around. Instead of trying to hack an Anki testing
