@@ -1,3 +1,6 @@
+meta.json  # anki global plugin settings (e.g. disabled)
+plugin.zip  # plugin distribution
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
