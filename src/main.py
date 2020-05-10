@@ -23,8 +23,14 @@ if TYPE_CHECKING:
 
 
 def buryCousins(self: SomeScheduler, card: "Card") -> None:
-    """ bury related cards that aren't marked as siblings """
+    """ bury related cards that aren't marked as siblings
+
+    Same as Anki: always delete from current rehearsal and if bury new / bury
+    review are set in deck options, bury until tomorrow
+    """
     # implementation mirrors anki's _burySiblings without the options
+
+    buryNew, buryRev = _buryConfig(self, card)
 
     toBury: Set[int] = set()  # note ids
 
@@ -62,17 +68,39 @@ def buryCousins(self: SomeScheduler, card: "Card") -> None:
         try:
             (self._revQueue if queue == QUEUE_TYPE_REV else self._newQueue).remove(cid)
         except ValueError:
-            # not actually scheduled. not sure why things end up here but anki
-            # protects against this too
+            # I'm not sure why things end up here but anki protects against
+            # this. It may be needed if the card is scheduled on a different
+            # deck so it doesn't appear in the current learning queue.
             pass
 
     if cousin_cards:
         tooltip("burying %d cousin card" % len(cousin_cards))
 
+    card_ids_to_bury = [
+        id
+        for id, queue in cousin_cards
+        if (buryNew and queue == QUEUE_TYPE_NEW)
+        or (buryRev and queue == QUEUE_TYPE_REV)
+    ]
+
     if isinstance(self, Scheduler):
-        buryCards(self, [id for id, _ in cousin_cards])
+        buryCards(self, card_ids_to_bury)
     else:
-        self.buryCards([id for id, _ in cousin_cards], manual=False)
+        self.buryCards(card_ids_to_bury, manual=False)
+
+
+def _buryConfig(self: SomeScheduler, card: "Card"):
+    """
+    get deck settings for burying cards until tomorrow instead of just until a
+    later session today
+    """
+
+    # ripped from top of _burySiblings in both Schedulers
+    nconf = self._newConf(card)
+    buryNew = nconf.get("bury", True)
+    rconf = self._revConf(card)
+    buryRev = rconf.get("bury", True)
+    return buryNew, buryRev
 
 
 def buryCards(self, cids: List[int], manual: bool = True) -> None:
