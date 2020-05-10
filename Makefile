@@ -14,7 +14,7 @@ build_test:
 	pip install .[test]
 
 test:
-	black --check .
 	flake8 src
 	mypy src
 	python -m doctest src/settings.py
+	black --check .

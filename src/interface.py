@@ -1,4 +1,4 @@
-from typing import List, Iterable
+from typing import List, Iterable, TYPE_CHECKING
 from functools import partial
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
@@ -10,7 +10,6 @@ from PyQt5.QtWidgets import (
     QComboBox,
     QCheckBox,
     QDoubleSpinBox,
-    QLineEdit,
     QLabel,
     QWidget,
 )
@@ -19,6 +18,9 @@ from anki.collection import _Collection
 from aqt import mw  # type: ignore
 
 from .settings import SettingsManager, MatchRule, Comparisons
+
+if TYPE_CHECKING:
+    from anki.models import NoteType  # noqa: F401
 
 
 def show_settings_dialog() -> None:
@@ -30,9 +32,7 @@ def show_settings_dialog() -> None:
     dialog_layout = QVBoxLayout()
     dialog.setLayout(dialog_layout)
 
-    note_types = {
-        model["name"]: int(model["id"]) for model in col.models.models.values()
-    }
+    note_types = list(col.models.models.values())
 
     append = QPushButton("Add rule")
 
@@ -95,20 +95,38 @@ class FormGrid(QGridLayout):
 
 
 class MatchRuleForm:
-    def __init__(self, note_types) -> None:
+    def __init__(self, note_types: List["NoteType"]) -> None:
         self._my_note_type = QComboBox()
-        for note_type, note_id in note_types.items():
-            self._my_note_type.addItem(note_type, note_id)
-
-        # TODO: turn LineEdits into QComboBox whose options are reset on
-        # currentTextChanged.connect
-        self._my_note_field = QLineEdit()
-
         self._other_note_type = QComboBox()
-        for note_type, note_id in note_types.items():
-            self._other_note_type.addItem(note_type, note_id)
 
-        self._other_note_field = QLineEdit()
+        for note_type in sorted(note_types, key=lambda n: n["name"]):
+            self._my_note_type.addItem(note_type["name"], int(note_type["id"]))
+            self._other_note_type.addItem(note_type["name"], int(note_type["id"]))
+
+        def setFieldNames(note_field_input: QComboBox, new_text):
+            # clear out old options
+            for index in range(note_field_input.count()):
+                note_field_input.removeItem(0)
+
+            print("setting field names for", new_text)
+            for note_type in note_types:
+                if note_type["name"] == new_text:
+                    for field in note_type["flds"]:
+                        print("adding", field["name"])
+                        note_field_input.addItem(field["name"])
+
+        self._my_note_field = QComboBox()
+        self._my_note_type.currentTextChanged.connect(
+            partial(setFieldNames, self._my_note_field)
+        )
+
+        self._other_note_field = QComboBox()
+        self._other_note_type.currentTextChanged.connect(
+            partial(setFieldNames, self._other_note_field)
+        )
+
+        setFieldNames(self._my_note_field, self._my_note_type.currentText())
+        setFieldNames(self._other_note_field, self._other_note_type.currentText())
 
         self._matcher = QComboBox()
         self._matcher.addItem("by prefix", Comparisons.prefix)
@@ -146,7 +164,7 @@ class MatchRuleForm:
             )
 
         if rule.my_field:
-            self._my_note_field.setText(rule.my_field)
+            self._my_note_field.setCurrentText(rule.my_field)
 
         if rule.cousin_note_model_id:
             self._other_note_type.setCurrentIndex(
@@ -154,7 +172,8 @@ class MatchRuleForm:
             )
 
         if rule.cousin_field:
-            self._other_note_field.setText(rule.cousin_field)
+            self._other_note_field.setCurrentText(rule.cousin_field)
+            print("loaded cousin field", rule.cousin_field)
 
         if rule.comparison:
             self._matcher.setCurrentIndex(self._matcher.findData(rule.comparison))
@@ -165,9 +184,9 @@ class MatchRuleForm:
     def make_rule(self) -> MatchRule:
         return MatchRule(
             int(self._my_note_type.currentData()),
-            self._my_note_field.text(),
+            self._my_note_field.currentText(),
             int(self._other_note_type.currentData()),
-            self._other_note_field.text(),
+            self._other_note_field.currentText(),
             self._matcher.currentData(),
             self._threshold.value(),
         )
