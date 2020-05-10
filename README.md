@@ -50,12 +50,19 @@ all cards containing `el`.
 # Development
 
 The easiest way to work on this locally is to clone this repo and symlink the
-src folder into your anki plugins. For me, that can be done by
+src folder into your anki plugins. This will register a plugin which will share
+settings with any other copy of this plugin that you have installed.
+
+On linux, with my Anki installation, this can be done by
 
 ```sh
 git clone git@github.com:AlexRiina/anki_cousins.git
-ln -s -t ~/.local/share/Anki2/addons21 `pwd`/anki_couins/src
+ln -s  `pwd`/src ~/.local/share/Anki2/addons21/beta_cousins
 ```
+
+To avoid overwriting your main settings while working on this plugin, you can
+either modify the `SettingsManager.key` or create a test profile in Anki
+(File -> Switch Profiles) and develop against that collection.
 
 # Testing
 
