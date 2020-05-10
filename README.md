@@ -61,6 +61,9 @@ ln -s -t ~/.local/share/Anki2/addons21 `pwd`/anki_couins/src
 
 Anki's a bit tough to test around. Instead of trying to hack an Anki testing
 environment, this plugin relies heavily on type statements and manual testing.
+
+To run the small automated linters and tests, run `make test`.
+
 The manual testing checklist is:
 
 1. read current settings
