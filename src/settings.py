@@ -97,11 +97,20 @@ def _similarityTest(a: str, b: str, percent_match: float) -> bool:
     >>> _similarityTest('hello', 'hello this is a test', 0.5)
     False
     """
+    #// removing the extra parts in cloze deletions to maximize accuracy
+    #// turns 'this is a {{c1::cloze::whaaaat??}} {{c2::test:what did you say}}'
+    # into this is a cloze test
+    texta = a.replace('}}', '::a}}')
+    texta2 = re.sub('{{.+?::', '', texta)
+    texta3 = re.sub('::.+?}}', '', texta2)
+    textb = b.replace('}}', '::a}}')
+    textb2 = re.sub('{{.+?::', '', textb)
+    textb3 = re.sub('::.+?}}', '', textb2)
     # don't accidentally run on empty cards. rather be safe
     if max(len(a), len(b)) < 4:
         return False
 
-    return difflib.SequenceMatcher(None, a, b).ratio() > percent_match
+    return difflib.SequenceMatcher(None, texta3.lower(), textb3.lower()).ratio() > percent_match
 
 
 def _contained_by(a: str, b: str, threshold: float):
