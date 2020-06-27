@@ -6,6 +6,7 @@ import difflib
 
 
 Serializeable = Union[int, str, float]
+CLOZE_EXTRACT = re.compile(r"{{(?P<group>.*?)::(?P<answer>.*?)(::.*?)?}}")
 
 
 class Comparisons(enum.Enum):
@@ -28,7 +29,7 @@ class MatchRule(NamedTuple):
         comparison = self.comparison
 
         if comparison == Comparisons.similarity:
-            return _similarityTest(a, b, self.threshold)
+            return _similarity_test()(a, b, self.threshold)
         elif comparison == Comparisons.prefix:
             return _commonPrefixTest(a, b, self.threshold)
         elif comparison == Comparisons.contains:
@@ -86,22 +87,40 @@ def _commonPrefixTest(a: str, b: str, percent_match: float) -> bool:
     return i > percent_match * max(len(a), len(b))
 
 
-def _similarityTest(a: str, b: str, percent_match: float) -> bool:
+class _similarity_test:
     """
-    >>> _similarityTest('xxxyyy', 'xxyxyy', 0.8)
+    >>> _similarity_test()('xxxyyy', 'xxyxyy', 0.8)
     True
 
-    >>> _similarityTest('xxxyyy', 'xxyxyy', 0.9)
+    >>> _similarity_test()('xxxyyy', 'xxyxyy', 0.9)
     False
 
-    >>> _similarityTest('hello', 'hello this is a test', 0.5)
+    >>> _similarity_test()('||c1::this|| that', 'this ||c1::that::noun||', 0.9)
+    False
+
+    >>> _similarity_test()('{{c1::this}} that', 'this {{c1::that::noun}}', 0.9)
+    True
+
+    >>> _similarity_test()('hello', 'hello this is a test', 0.5)
     False
     """
-    # don't accidentally run on empty cards. rather be safe
-    if max(len(a), len(b)) < 4:
-        return False
 
-    return difflib.SequenceMatcher(None, a, b).ratio() > percent_match
+    def __call__(self, a: str, b: str, percent_match: float) -> bool:
+        # don't accidentally run on empty cards. rather be safe
+        if max(len(a), len(b)) < 4:
+            return False
+
+        return (
+            difflib.SequenceMatcher(
+                None, self._preprocess(a), self._preprocess(b)
+            ).ratio()
+            > percent_match
+        )
+
+    @classmethod
+    @lru_cache
+    def _preprocess(self, a: str) -> str:
+        return CLOZE_EXTRACT.sub(r"\g<answer>", a).lower()
 
 
 def _contained_by(a: str, b: str, threshold: float):
@@ -138,7 +157,7 @@ class _cloze_contained_by:
         # answers from a
         return [
             re.compile(r"\b{}\b".format(re.escape(match.group("answer"))))
-            for match in re.finditer(r"{{(?P<group>.*?)::(?P<answer>.*?)(::.*?)?}}", a)
+            for match in CLOZE_EXTRACT.finditer(a)
             # don't accidentally suppress on concepts like "2"
             if len(match.group("answer")) > 3
         ]
