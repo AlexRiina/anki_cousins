@@ -100,7 +100,7 @@ class _similarity_test:
     >>> _similarity_test()('||c1::this|| that', 'this ||c1::that::noun||', 0.9)
     False
 
-    >>> _similarity_test()('{{c1::this}} that', 'this {{c1::that::noun}}', 0.9)
+    >>> _similarity_test()('{{c1::this}}&nbsp;that', 'this {{c1::that::noun}}', 0.9)
     True
 
     >>> _similarity_test()('hello', 'hello this is a test', 0.5)
@@ -121,6 +121,8 @@ class _similarity_test:
     @classmethod
     @lru_cache
     def _preprocess(self, a: str) -> str:
+        # replace html entity that gets frequently entered in cloze cards
+        a = a.replace("&nbsp;", " ")
         return CLOZE_EXTRACT.sub(r"\g<answer>", a).lower()
 
 
