@@ -1,9 +1,8 @@
-import re
-from typing import NamedTuple, Iterable, List, Dict, Union
-from functools import lru_cache
-import enum
 import difflib
-
+import enum
+import re
+from functools import lru_cache
+from typing import Dict, Iterable, List, NamedTuple, Union
 
 Serializeable = Union[int, str, float]
 CLOZE_EXTRACT = re.compile(r"{{(?P<group>.*?)::(?P<answer>.*?)(::.*?)?}}")
@@ -64,17 +63,20 @@ class SettingsManager:
     def _deserialize_rule(stored: List[Serializeable]) -> MatchRule:
         rule_dict = dict(zip(MatchRule._fields, stored))
         comparison = Comparisons[rule_dict.pop("comparison")]  # type: ignore
+
         return MatchRule(comparison=comparison, **rule_dict)  # type: ignore
 
     @staticmethod
     def _serialize_rule(rule: MatchRule) -> Dict[str, Serializeable]:
         rule_dict = rule._asdict()
         rule_dict["comparison"] = rule.comparison.name
+
         return rule_dict
 
 
 def _commonPrefixTest(a: str, b: str, percent_match: float) -> bool:
     # don't accidentally run on empty cards. rather be safe
+
     if min(len(a), len(b)) < 4:
         return False
 
@@ -107,15 +109,14 @@ class _similarity_test:
 
     def __call__(self, a: str, b: str, percent_match: float) -> bool:
         # don't accidentally run on empty cards. rather be safe
+
+        a = self._preprocess(a)
+        b = self._preprocess(b)
+
         if max(len(a), len(b)) < 4:
             return False
 
-        return (
-            difflib.SequenceMatcher(
-                None, self._preprocess(a), self._preprocess(b)
-            ).ratio()
-            > percent_match
-        )
+        return difflib.SequenceMatcher(None, a, b).ratio() > percent_match
 
     @classmethod
     @lru_cache
@@ -155,6 +156,7 @@ class _cloze_contained_by:
     def _extra_answers(self, a: str) -> List[re.Pattern]:
         # locally cached so for each a vs b comparison we don't re-extract
         # answers from a
+
         return [
             re.compile(r"\b{}\b".format(re.escape(match.group("answer"))))
             for match in CLOZE_EXTRACT.finditer(a)
