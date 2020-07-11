@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Iterable, List, Set, Tuple, Union
 
+from anki.collection import _Collection as Collection
 from anki.consts import (
     QUEUE_TYPE_MANUALLY_BURIED,
     QUEUE_TYPE_NEW,
@@ -7,14 +8,15 @@ from anki.consts import (
     QUEUE_TYPE_SIBLING_BURIED,
 )
 from anki.hooks import wrap
+from anki.models import NoteType
 from anki.notes import Note
 from anki.sched import Scheduler
 from anki.schedv2 import Scheduler as SchedulerV2
-from anki.utils import ids2str, intTime
+from anki.utils import ids2str, intTime, splitFields, stripHTMLMedia
+
 from aqt.utils import tooltip  # type: ignore
 
 from .settings import SettingsManager
-
 
 SomeScheduler = Union[Scheduler, SchedulerV2]
 
@@ -39,6 +41,7 @@ def buryCousins(self: SomeScheduler, card: "Card") -> None:
     def field_value(note, field_name):
         note_type = self.col.models.get(note.mid)
         field_number = self.col.models.fieldMap(note_type)[field_name][0]
+
         return note.fields[field_number]
 
     config = SettingsManager(self.col).load()
@@ -100,6 +103,7 @@ def _buryConfig(self: SomeScheduler, card: "Card"):
     buryNew = nconf.get("bury", True)
     rconf = self._revConf(card)
     buryRev = rconf.get("bury", True)
+
     return buryNew, buryRev
 
 
@@ -142,7 +146,53 @@ def _cousinCards(self: SomeScheduler, note_ids: Set[int]) -> Iterable[Tuple[int,
     )  # type: ignore
 
 
+def findDupes(self: Collection, *args, **kwargs) -> List[Tuple[str, List[int]]]:
+    config = SettingsManager(self).load()
+
+    def extract_field(model_id, field_name) -> Iterable[Tuple[int, str]]:
+        # type works better in future anki
+        model: NoteType = self.models.get(model_id)
+        field_ord: int = next(
+            field["ord"] for field in model["flds"] if field["name"] == field_name
+        )
+
+        assert self.db
+
+        for note_id, fields in self.db.all(
+            "select id, flds from notes where mid = ?", model_id
+        ):
+            value = splitFields(fields)[field_ord]
+            yield note_id, stripHTMLMedia(value)
+
+    duplicate_groups: List[Tuple[str, List[int]]] = []
+
+    for rule in config:
+        my_note_fields = list(extract_field(rule.my_note_model_id, rule.my_field))
+        cousin_note_fields = list(
+            extract_field(rule.cousin_note_model_id, rule.cousin_field)
+        )
+
+        for my_note_id, my_note_field in my_note_fields:
+            my_matches = []
+
+            for cousin_note_id, cousin_note_field in cousin_note_fields:
+                if my_note_id == cousin_note_id:
+                    continue
+
+                if rule.test(my_note_field, cousin_note_field):
+                    my_matches.append(cousin_note_id)
+
+            if my_matches:
+                my_matches.append(my_note_id)
+                duplicate_groups.append(
+                    (f"[{rule.comparison.name}] {my_note_field}", my_matches)
+                )
+
+    return duplicate_groups
+
+
 # Anki doesn't have hooks in all of the right places, so monkey patching
 # private methods is an established if fragile pattern
 Scheduler._burySiblings = wrap(Scheduler._burySiblings, buryCousins, "after")  # type: ignore
 SchedulerV2._burySiblings = wrap(SchedulerV2._burySiblings, buryCousins, "after")  # type: ignore
+Collection.findDupes = wrap(Collection.findDupes, findDupes, None)  # type: ignore
