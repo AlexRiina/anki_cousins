@@ -7,7 +7,6 @@ from anki.consts import (
     QUEUE_TYPE_REV,
     QUEUE_TYPE_SIBLING_BURIED,
 )
-from anki.hooks import wrap
 from anki.models import NoteType
 from anki.notes import Note
 from anki.sched import Scheduler
@@ -189,10 +188,3 @@ def findDupes(self: Collection, *args, **kwargs) -> List[Tuple[str, List[int]]]:
                 )
 
     return duplicate_groups
-
-
-# Anki doesn't have hooks in all of the right places, so monkey patching
-# private methods is an established if fragile pattern
-Scheduler._burySiblings = wrap(Scheduler._burySiblings, buryCousins, "after")  # type: ignore
-SchedulerV2._burySiblings = wrap(SchedulerV2._burySiblings, buryCousins, "after")  # type: ignore
-Collection.findDupes = wrap(Collection.findDupes, findDupes, None)  # type: ignore
