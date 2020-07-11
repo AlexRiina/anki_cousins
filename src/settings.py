@@ -1,8 +1,8 @@
 import difflib
 import enum
 import re
-from functools import lru_cache
-from typing import Dict, Iterable, List, NamedTuple, Union
+from functools import lru_cache, wraps
+from typing import Callable, Dict, Iterable, List, NamedTuple, Tuple, Union
 
 Serializeable = Union[int, str, float]
 CLOZE_EXTRACT = re.compile(r"{{(?P<group>.*?)::(?P<answer>.*?)(::.*?)?}}")
@@ -24,7 +24,7 @@ class MatchRule(NamedTuple):
     comparison: Comparisons
     threshold: float
 
-    def test(self, a: str, b: str) -> bool:
+    def test(self, a: List[str], b: List[str]) -> List[Tuple[str, str]]:
         comparison = self.comparison
 
         if comparison == Comparisons.similarity:
@@ -38,6 +38,25 @@ class MatchRule(NamedTuple):
         elif comparison == Comparisons.cloze_contained_by:
             return _cloze_contained_by()(a, b, self.threshold)
         raise ValueError("unrecognized comparison test")
+
+
+def _one_by_one(
+    test_func: Callable[[str, str, float], bool]
+) -> Callable[[List[str], List[str], float], List[Tuple[str, str]]]:
+    """ convert boolean comparison function to list based comparisons """
+
+    @wraps(test_func)
+    def inner(list_a, list_b, threshold):
+        results = []
+
+        for a in list_a:
+            for b in list_b:
+                if test_func(a, b, threshold):
+                    results.append((a, b))
+
+        return results
+
+    return inner
 
 
 class SettingsManager:
@@ -74,6 +93,7 @@ class SettingsManager:
         return rule_dict
 
 
+@_one_by_one
 def _commonPrefixTest(a: str, b: str, percent_match: float) -> bool:
     # don't accidentally run on empty cards. rather be safe
 
@@ -91,27 +111,29 @@ def _commonPrefixTest(a: str, b: str, percent_match: float) -> bool:
 
 class _similarity_test:
     """
-    >>> _similarity_test()('xxxyyy', 'xxyxyy', 0.8)
+    >>> bool(_similarity_test()(['xxxyyy'], ['xxyxyy'], 0.8))
     True
 
-    >>> _similarity_test()('xxxyyy', 'xxyxyy', 0.9)
+    >>> bool(_similarity_test()(['xxxyyy'], ['xxyxyy'], 0.9))
     False
 
-    >>> _similarity_test()('||c1::this|| that', 'this ||c1::that::noun||', 0.9)
+    >>> bool(_similarity_test()(['||c1::this|| that'], ['this ||c1::that::noun||'], 0.9))
     False
 
-    >>> _similarity_test()('{{c1::this}}&nbsp;that', 'this {{c1::that::noun}}', 0.9)
+    >>> bool(_similarity_test()(['{{c1::this}}&nbsp;that'], ['this {{c1::that::noun}}'], 0.9))
     True
 
-    >>> _similarity_test()('hello', 'hello this is a test', 0.5)
+    >>> bool(_similarity_test()(['hello'], ['hello this is a test'], 0.5))
     False
     """
 
-    def __call__(self, a: str, b: str, percent_match: float) -> bool:
+    @staticmethod
+    @_one_by_one
+    def __call__(a: str, b: str, percent_match: float) -> bool:
         # don't accidentally run on empty cards. rather be safe
 
-        a = self._preprocess(a)
-        b = self._preprocess(b)
+        a = _similarity_test._preprocess(a)
+        b = _similarity_test._preprocess(b)
 
         if max(len(a), len(b)) < 4:
             return False
@@ -123,35 +145,42 @@ class _similarity_test:
     def _preprocess(self, a: str) -> str:
         # replace html entity that gets frequently entered in cloze cards
         a = a.replace("&nbsp;", " ")
+
         return CLOZE_EXTRACT.sub(r"\g<answer>", a).lower()
 
 
+@_one_by_one
 def _contained_by(a: str, b: str, threshold: float):
     return len(a) > 3 and a in b
 
 
-def _contains(a: str, b: str, threshold: float):
+def _contains(a: List[str], b: List[str], threshold: float):
     return _contained_by(b, a, threshold)
 
 
 class _cloze_contained_by:
     """ terms in cloze deletion a contained anywhere in b
 
-    >>> _cloze_contained_by()('{{c1::hello}}', 'test hello test', 1)
+    >>> bool(_cloze_contained_by()(['{{c1::hello}}'], ['test hello test'], 1))
     True
 
-    >>> _cloze_contained_by()('{{c1::hello::greeting}}', 'test hello test', 1)
+    >>> bool(_cloze_contained_by()(['{{c1::hello::greeting}}'], ['test hello test'], 1))
     True
 
-    >>> _cloze_contained_by()('{{c1::hello}}', 'bye', 1)
+    >>> bool(_cloze_contained_by()(['{{c1::hello}}'], ['bye'], 1))
     False
 
-    >>> _cloze_contained_by()('Phase {{c1::2::#N}} clinical trial', '2 x 2', 1)
+    >>> bool(_cloze_contained_by()(['Phase {{c1::2::#N}} clinical trial'], ['2 x 2'], 1))
     False
     """
 
-    def __call__(self, a: str, b: str, threshold: float):
-        return any(cloze_answer.search(b) for cloze_answer in self._extra_answers(a))
+    @staticmethod
+    @_one_by_one
+    def __call__(a: str, b: str, threshold: float):
+        return any(
+            cloze_answer.search(b)
+            for cloze_answer in _cloze_contained_by._extra_answers(a)
+        )
 
     @classmethod
     @lru_cache

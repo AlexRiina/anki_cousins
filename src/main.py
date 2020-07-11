@@ -37,7 +37,7 @@ def buryCousins(self: SomeScheduler, card: "Card") -> None:
 
     my_note = card.note()
 
-    def field_value(note, field_name):
+    def field_value(note, field_name) -> str:
         note_type = self.col.models.get(note.mid)
         field_number = self.col.models.fieldMap(note_type)[field_name][0]
 
@@ -50,17 +50,19 @@ def buryCousins(self: SomeScheduler, card: "Card") -> None:
             continue
 
         my_value = field_value(my_note, rule.my_field)
+        cousin_values = [
+            field_value(cousin_note, rule.cousin_field)
+            for cousin_note in _scheduledNotes(self)
+            if rule.cousin_note_model_id != cousin_note.mid
+            and my_note.id == cousin_note.id
+        ]
+
+        matches = rule.test([my_value], cousin_values)
 
         for cousin_note in _scheduledNotes(self):
-            if rule.cousin_note_model_id != cousin_note.mid:
-                continue
-
-            if my_note.id == cousin_note.id:
-                continue
-
             cousin_value = field_value(cousin_note, rule.cousin_field)
 
-            if rule.test(my_value, cousin_value):
+            if (my_value, cousin_value) in matches:
                 # not super efficient, could just look up cids all at the end
                 toBury.add(cousin_note.id)
 
@@ -186,6 +188,10 @@ def findDupes(
             extract_field(rule.cousin_note_model_id, rule.cousin_field)
         )
 
+        matches = rule.test(
+            [f[1] for f in my_note_fields], [f[1] for f in cousin_note_fields],
+        )
+
         for my_note_id, my_note_field in my_note_fields:
             my_matches = []
 
@@ -193,7 +199,7 @@ def findDupes(
                 if my_note_id == cousin_note_id:
                     continue
 
-                if rule.test(my_note_field, cousin_note_field):
+                if (my_note_field, cousin_note_field) in matches:
                     my_matches.append(cousin_note_id)
 
             if my_matches:
