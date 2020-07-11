@@ -145,12 +145,27 @@ def _cousinCards(self: SomeScheduler, note_ids: Set[int]) -> Iterable[Tuple[int,
     )  # type: ignore
 
 
-def findDupes(self: Collection, *args, **kwargs) -> List[Tuple[str, List[int]]]:
+def findDupes(
+    self: Collection, fieldName: str, search: str = "", *, _old
+) -> List[Tuple[str, List[int]]]:
+    """ re-implementation of findDupes using the fuzzy rules """
+    # TODO should we call the _old and prepend that?
     config = SettingsManager(self).load()
+
+    search_filters = []
+
+    if search:
+        search_filters.append(f"({search})")
+
+    if fieldName:
+        fieldName = fieldName.replace('"', '"')
+        search_filters.append(f'"{fieldName}:*"')
 
     def extract_field(model_id, field_name) -> Iterable[Tuple[int, str]]:
         # type works better in future anki
         model: NoteType = self.models.get(model_id)
+        note_ids = self.findNotes(" ".join(search_filters + [f'note:{model["name"]}']))
+
         field_ord: int = next(
             field["ord"] for field in model["flds"] if field["name"] == field_name
         )
@@ -158,7 +173,7 @@ def findDupes(self: Collection, *args, **kwargs) -> List[Tuple[str, List[int]]]:
         assert self.db
 
         for note_id, fields in self.db.all(
-            "select id, flds from notes where mid = ?", model_id
+            "select id, flds from notes where id in " + ids2str(note_ids)
         ):
             value = splitFields(fields)[field_ord]
             yield note_id, stripHTMLMedia(value)
