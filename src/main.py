@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import TYPE_CHECKING, DefaultDict, Iterable, List, Set, Tuple, Union
+from typing import TYPE_CHECKING, DefaultDict, Iterable, List, Set, Tuple, Union, Dict
 
 from anki.collection import _Collection as Collection
 from anki.consts import (
@@ -73,7 +73,11 @@ def buryCousins(self: SomeScheduler, card: "Card") -> None:
 
     cousin_cards = list(_cousinCards(self, toBury))
 
-    for cid, queue in cousin_cards:
+    count_adjustments: Dict[int, Set[int]] = {
+        QUEUE_TYPE_REV: set(),
+        QUEUE_TYPE_NEW: set(),
+    }
+    for cid, nid, queue in cousin_cards:
         try:
             (self._revQueue if queue == QUEUE_TYPE_REV else self._newQueue).remove(cid)
         except ValueError:
@@ -81,13 +85,24 @@ def buryCousins(self: SomeScheduler, card: "Card") -> None:
             # this. It may be needed if the card is scheduled on a different
             # deck so it doesn't appear in the current learning queue.
             pass
+        else:
+            count_adjustments[queue].add(nid)
+
+    # Decrement counts so that Anki doesn't run out of cards, which causes it
+    # to rebuild queues and makes the buried cards show up again.
+    # NOTE: anki itself does not do this adjustment. When burying a sibling in
+    # the same queue, the count (number of notes) has already been decremented
+    # but if burying a sibling in a different queue, the count is not adjusted
+    # which can resurrect a buried card.
+    self.revCount -= len(count_adjustments[QUEUE_TYPE_REV])
+    self.newCount -= len(count_adjustments[QUEUE_TYPE_NEW])
 
     if cousin_cards:
         tooltip("burying %d cousin card" % len(cousin_cards))
 
     card_ids_to_bury = [
         id
-        for id, queue in cousin_cards
+        for id, nid, queue in cousin_cards
         if (buryNew and queue == QUEUE_TYPE_NEW)
         or (buryRev and queue == QUEUE_TYPE_REV)
     ]
@@ -141,12 +156,14 @@ select distinct(nid) from cards where
         yield Note(self.col, id=nid)
 
 
-def _cousinCards(self: SomeScheduler, note_ids: Set[int]) -> Iterable[Tuple[int, int]]:
+def _cousinCards(
+    self: SomeScheduler, note_ids: Set[int]
+) -> Iterable[Tuple[int, int, int]]:
     assert self.col.db  # optional in typing system but set by this point
 
     return self.col.db.execute(
         f"""
-    select id, queue from cards where nid in {ids2str(list(note_ids))}
+    select id, nid, queue from cards where nid in {ids2str(list(note_ids))}
     and (queue={QUEUE_TYPE_NEW} or (queue={QUEUE_TYPE_REV} and due<=?))""",
         self.today,
     )  # type: ignore
