@@ -1,5 +1,6 @@
 Anki plugin to bury related cards even if they're not siblings. Configure rules
-so you can suppress similar cards from different notes.
+so you can suppress similar cards from different notes. These rules can are
+also used in identifying duplicate cards in the card browser.
 
 # Configuring Rules
 
