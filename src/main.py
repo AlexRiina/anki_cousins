@@ -86,17 +86,14 @@ def buryCousins(self: SomeScheduler, card: "Card") -> None:
             # deck so it doesn't appear in the current learning queue.
             pass
         else:
-            # decrement counts so that Anki doesn't run out of cards, which
-            # causes it to rebuild queues and makes the buried cards show up
-            # again
-
             count_adjustments[queue].add(nid)
 
-    # NOTE: anki itself does not do this adjustment. When burying a
-    # sibling in the same queue, the count (number of notes) has
-    # already been decremented but if burying a sibling in a different
-    # queue, the count is not adjusted which can resurrect a buried
-    # card.
+    # Decrement counts so that Anki doesn't run out of cards, which causes it
+    # to rebuild queues and makes the buried cards show up again.
+    # NOTE: anki itself does not do this adjustment. When burying a sibling in
+    # the same queue, the count (number of notes) has already been decremented
+    # but if burying a sibling in a different queue, the count is not adjusted
+    # which can resurrect a buried card.
     self.revCount -= len(count_adjustments[QUEUE_TYPE_REV])
     self.newCount -= len(count_adjustments[QUEUE_TYPE_NEW])
 
