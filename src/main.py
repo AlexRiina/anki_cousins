@@ -50,17 +50,21 @@ def buryCousins(self: SomeScheduler, card: "Card") -> None:
         if rule.my_note_model_id != my_note.mid:
             continue
 
+        potential_cousin_notes = [
+            note
+            for note in _scheduledNotes(self)
+            if rule.cousin_note_model_id == note.mid and my_note.id != note.id
+        ]
+
         my_value = field_value(my_note, rule.my_field)
         cousin_values = [
             field_value(cousin_note, rule.cousin_field)
-            for cousin_note in _scheduledNotes(self)
-            if rule.cousin_note_model_id != cousin_note.mid
-            and my_note.id == cousin_note.id
+            for cousin_note in potential_cousin_notes
         ]
 
         matches = rule.test([my_value], cousin_values)
 
-        for cousin_note in _scheduledNotes(self):
+        for cousin_note in potential_cousin_notes:
             cousin_value = field_value(cousin_note, rule.cousin_field)
 
             if (my_value, cousin_value) in matches:
