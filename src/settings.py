@@ -93,20 +93,33 @@ class SettingsManager:
         return rule_dict
 
 
-@_one_by_one
-def _commonPrefixTest(a: str, b: str, percent_match: float) -> bool:
+def _commonPrefixTest(list_a: List[str], list_b: List[str], percent_match: float) -> List[Tuple[str, str]]:
+    """
+    >>> _commonPrefixTest(['abcdefg'], ['abcdexx'], 0.65)
+    [('abcdefg', 'abcdexx')]
+
+    >>> _commonPrefixTest(['abcdefg'], ['abcdexx'], 0.95)
+    []
+    """
     # don't accidentally run on empty cards. rather be safe
+    list_a = [a for a in list_a if len(a) >= 4]
+    list_b = [a for a in list_b if len(a) >= 4]
 
-    if min(len(a), len(b)) < 4:
-        return False
+    # sort both lists by length
 
-    for i, (al, bl) in enumerate(zip(a, b)):
-        if al != bl:
-            break
-    else:
-        i = i + 1
+    results = []
+    for a in list_a:
+        for b in list_b:
+            for i, (al, bl) in enumerate(zip(a, b)):
+                if al != bl:
+                    break
+            else:
+                i = i + 1
 
-    return i > percent_match * max(len(a), len(b))
+            if i > percent_match * max(len(a), len(b)):
+                results.append((a, b))
+
+    return results
 
 
 class _similarity_test:
