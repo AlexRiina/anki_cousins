@@ -152,7 +152,12 @@ def findDupes(
     self: Collection, fieldName: str, search: str = "", *, _old
 ) -> List[Tuple[str, List[int]]]:
     """ re-implementation of findDupes using the fuzzy rules """
-    # TODO should we call the _old and prepend that?
+
+    exact_duplicates = [
+        (f"[exacty] {value}", note_ids)
+        for value, note_ids in _old(self, fieldName, search)
+    ]
+
     config = SettingsManager(self).load()
 
     search_filters = []
@@ -230,4 +235,8 @@ def findDupes(
                     duplicate_groups[key].add(my_note_id)
                     duplicate_groups[key].add(cousin_note_id)
 
-    return [(key, list(note_ids)) for key, note_ids in duplicate_groups.items()]
+    cousin_matches = [
+        (key, list(note_ids)) for key, note_ids in duplicate_groups.items()
+    ]
+
+    return exact_duplicates + cousin_matches
