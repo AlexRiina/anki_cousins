@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Iterable, List, Set, Tuple, Union
+from collections import defaultdict
+from typing import TYPE_CHECKING, DefaultDict, Iterable, List, Set, Tuple, Union
 
 from anki.collection import _Collection as Collection
 from anki.consts import (
@@ -159,10 +160,6 @@ def findDupes(
     if search:
         search_filters.append(f"({search})")
 
-    if fieldName:
-        fieldName = fieldName.replace('"', '"')
-        search_filters.append(f'"{fieldName}:*"')
-
     def extract_field(model_id, field_name) -> Iterable[Tuple[int, str]]:
         # type works better in future anki
         model: NoteType = self.models.get(model_id)
@@ -180,32 +177,57 @@ def findDupes(
             value = splitFields(fields)[field_ord]
             yield note_id, stripHTMLMedia(value)
 
-    duplicate_groups: List[Tuple[str, List[int]]] = []
+    duplicate_groups: DefaultDict[str, Set[int]] = defaultdict(set)
 
     for rule in config:
+        # only use rules based off the selected field
+        if rule.my_field != fieldName:
+            continue
+
         my_note_fields = list(extract_field(rule.my_note_model_id, rule.my_field))
-        cousin_note_fields = list(
-            extract_field(rule.cousin_note_model_id, rule.cousin_field)
+        my_values = [f[1] for f in my_note_fields]
+
+        same_field = (
+            rule.cousin_note_model_id == rule.my_note_model_id
+            and rule.cousin_field == rule.my_field
         )
 
-        matches = rule.test(
-            [f[1] for f in my_note_fields], [f[1] for f in cousin_note_fields],
-        )
+        if same_field:
+            cousin_note_fields = my_note_fields
+            cousin_values = my_values
+        else:
+            cousin_note_fields = list(
+                extract_field(rule.cousin_note_model_id, rule.cousin_field)
+            )
+            cousin_values = [f[1] for f in cousin_note_fields]
+
+        matches = rule.test(my_values, cousin_values)
+
+        if not matches:
+            continue
+
+        my_mapping = defaultdict(list)
 
         for my_note_id, my_note_field in my_note_fields:
-            my_matches = []
+            my_mapping[my_note_field].append(my_note_id)
+
+        if same_field:
+            cousin_mapping = my_mapping
+        else:
+            cousin_mapping = defaultdict(list)
 
             for cousin_note_id, cousin_note_field in cousin_note_fields:
-                if my_note_id == cousin_note_id:
-                    continue
+                cousin_mapping[cousin_note_field].append(cousin_note_id)
 
-                if (my_note_field, cousin_note_field) in matches:
-                    my_matches.append(cousin_note_id)
+        for my_value, cousin_value in matches:
+            for my_note_id in my_mapping[my_value]:
+                key = f"[{rule.comparison.name}] {my_value}"
 
-            if my_matches:
-                my_matches.append(my_note_id)
-                duplicate_groups.append(
-                    (f"[{rule.comparison.name}] {my_note_field}", my_matches)
-                )
+                for cousin_note_id in cousin_mapping[cousin_value]:
+                    if my_note_id == cousin_note_id:
+                        continue
 
-    return duplicate_groups
+                    duplicate_groups[key].add(my_note_id)
+                    duplicate_groups[key].add(cousin_note_id)
+
+    return [(key, list(note_ids)) for key, note_ids in duplicate_groups.items()]
