@@ -154,7 +154,7 @@ def findDupes(
     """ re-implementation of findDupes using the fuzzy rules """
 
     exact_duplicates = [
-        (f"[exacty] {value}", note_ids)
+        (f"[exact] {value}", note_ids)
         for value, note_ids in _old(self, fieldName, search)
     ]
 
