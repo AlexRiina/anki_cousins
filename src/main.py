@@ -1,20 +1,22 @@
-from typing import TYPE_CHECKING, Iterable, List, Set, Tuple, Union
+from collections import defaultdict
+from typing import TYPE_CHECKING, DefaultDict, Iterable, List, Set, Tuple, Union
 
+from anki.collection import _Collection as Collection
 from anki.consts import (
     QUEUE_TYPE_MANUALLY_BURIED,
     QUEUE_TYPE_NEW,
     QUEUE_TYPE_REV,
     QUEUE_TYPE_SIBLING_BURIED,
 )
-from anki.hooks import wrap
+from anki.models import NoteType
 from anki.notes import Note
 from anki.sched import Scheduler
 from anki.schedv2 import Scheduler as SchedulerV2
-from anki.utils import ids2str, intTime
+from anki.utils import ids2str, intTime, splitFields, stripHTMLMedia
+
 from aqt.utils import tooltip  # type: ignore
 
 from .settings import SettingsManager
-
 
 SomeScheduler = Union[Scheduler, SchedulerV2]
 
@@ -36,9 +38,10 @@ def buryCousins(self: SomeScheduler, card: "Card") -> None:
 
     my_note = card.note()
 
-    def field_value(note, field_name):
+    def field_value(note, field_name) -> str:
         note_type = self.col.models.get(note.mid)
         field_number = self.col.models.fieldMap(note_type)[field_name][0]
+
         return note.fields[field_number]
 
     config = SettingsManager(self.col).load()
@@ -47,18 +50,24 @@ def buryCousins(self: SomeScheduler, card: "Card") -> None:
         if rule.my_note_model_id != my_note.mid:
             continue
 
+        potential_cousin_notes = [
+            note
+            for note in _scheduledNotes(self)
+            if rule.cousin_note_model_id == note.mid and my_note.id != note.id
+        ]
+
         my_value = field_value(my_note, rule.my_field)
+        cousin_values = [
+            field_value(cousin_note, rule.cousin_field)
+            for cousin_note in potential_cousin_notes
+        ]
 
-        for cousin_note in _scheduledNotes(self):
-            if rule.cousin_note_model_id != cousin_note.mid:
-                continue
+        matches = rule.test([my_value], cousin_values)
 
-            if my_note.id == cousin_note.id:
-                continue
-
+        for cousin_note in potential_cousin_notes:
             cousin_value = field_value(cousin_note, rule.cousin_field)
 
-            if rule.test(my_value, cousin_value):
+            if (my_value, cousin_value) in matches:
                 # not super efficient, could just look up cids all at the end
                 toBury.add(cousin_note.id)
 
@@ -100,6 +109,7 @@ def _buryConfig(self: SomeScheduler, card: "Card"):
     buryNew = nconf.get("bury", True)
     rconf = self._revConf(card)
     buryRev = rconf.get("bury", True)
+
     return buryNew, buryRev
 
 
@@ -142,7 +152,95 @@ def _cousinCards(self: SomeScheduler, note_ids: Set[int]) -> Iterable[Tuple[int,
     )  # type: ignore
 
 
-# Anki doesn't have hooks in all of the right places, so monkey patching
-# private methods is an established if fragile pattern
-Scheduler._burySiblings = wrap(Scheduler._burySiblings, buryCousins, "after")  # type: ignore
-SchedulerV2._burySiblings = wrap(SchedulerV2._burySiblings, buryCousins, "after")  # type: ignore
+def findDupes(
+    self: Collection, fieldName: str, search: str = "", *, _old
+) -> List[Tuple[str, List[int]]]:
+    """ re-implementation of findDupes using the fuzzy rules """
+
+    exact_duplicates = [
+        (f"[exact] {value}", note_ids)
+        for value, note_ids in _old(self, fieldName, search)
+    ]
+
+    config = SettingsManager(self).load()
+
+    search_filters = []
+
+    if search:
+        search_filters.append(f"({search})")
+
+    def extract_field(model_id, field_name) -> Iterable[Tuple[int, str]]:
+        # type works better in future anki
+        model: NoteType = self.models.get(model_id)
+        note_ids = self.findNotes(" ".join(search_filters + [f'note:{model["name"]}']))
+
+        field_ord: int = next(
+            field["ord"] for field in model["flds"] if field["name"] == field_name
+        )
+
+        assert self.db
+
+        for note_id, fields in self.db.all(
+            "select id, flds from notes where id in " + ids2str(note_ids)
+        ):
+            value = splitFields(fields)[field_ord]
+            yield note_id, stripHTMLMedia(value)
+
+    duplicate_groups: DefaultDict[str, Set[int]] = defaultdict(set)
+
+    for rule in config:
+        # only use rules based off the selected field
+        if rule.my_field != fieldName:
+            continue
+
+        my_note_fields = list(extract_field(rule.my_note_model_id, rule.my_field))
+        my_values = [f[1] for f in my_note_fields]
+
+        same_field = (
+            rule.cousin_note_model_id == rule.my_note_model_id
+            and rule.cousin_field == rule.my_field
+        )
+
+        if same_field:
+            cousin_note_fields = my_note_fields
+            cousin_values = my_values
+        else:
+            cousin_note_fields = list(
+                extract_field(rule.cousin_note_model_id, rule.cousin_field)
+            )
+            cousin_values = [f[1] for f in cousin_note_fields]
+
+        matches = rule.test(my_values, cousin_values)
+
+        if not matches:
+            continue
+
+        my_mapping = defaultdict(list)
+
+        for my_note_id, my_note_field in my_note_fields:
+            my_mapping[my_note_field].append(my_note_id)
+
+        if same_field:
+            cousin_mapping = my_mapping
+        else:
+            cousin_mapping = defaultdict(list)
+
+            for cousin_note_id, cousin_note_field in cousin_note_fields:
+                cousin_mapping[cousin_note_field].append(cousin_note_id)
+
+        for my_value, cousin_value in matches:
+            for my_note_id in my_mapping[my_value]:
+                key = f"[{rule.comparison.name}] {my_value}"
+
+                for cousin_note_id in cousin_mapping[cousin_value]:
+                    if my_note_id == cousin_note_id:
+                        continue
+
+                    duplicate_groups[key].add(my_note_id)
+                    duplicate_groups[key].add(cousin_note_id)
+
+    cousin_matches = [
+        (key, list(note_ids)) for key, note_ids in duplicate_groups.items()
+    ]
+
+    return exact_duplicates + cousin_matches
