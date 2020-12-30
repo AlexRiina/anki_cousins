@@ -68,17 +68,20 @@ class SettingsManager:
         self.col = col
 
     def load(self) -> List[MatchRule]:
-        return [self._deserialize_rule(row) for row in self.col.conf.get(self.key, [])]
+        return [
+            self._deserialize_rule(row) for row in self.col.get_config(self.key, [])
+        ]
 
     def save(self, match_rules: Iterable[MatchRule]):
-        self.col.conf[self.key] = sorted(
-            [
-                list(self._serialize_rule(match_rule).values())
-                for match_rule in match_rules
-            ]
+        self.col.set_config(
+            self.key,
+            sorted(
+                [
+                    list(self._serialize_rule(match_rule).values())
+                    for match_rule in match_rules
+                ]
+            ),
         )
-
-        self.col.setMod()
 
     @staticmethod
     def _deserialize_rule(stored: List[Serializeable]) -> MatchRule:
