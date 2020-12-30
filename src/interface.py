@@ -32,7 +32,7 @@ def show_settings_dialog() -> None:
     dialog_layout = QVBoxLayout()
     dialog.setLayout(dialog_layout)
 
-    note_types = list(col.models.models.values())
+    note_types = col.models.all()
 
     append = QPushButton("Add rule")
 
@@ -108,11 +108,9 @@ class MatchRuleForm:
             for index in range(note_field_input.count()):
                 note_field_input.removeItem(0)
 
-            print("setting field names for", new_text)
             for note_type in note_types:
                 if note_type["name"] == new_text:
                     for field in note_type["flds"]:
-                        print("adding", field["name"])
                         note_field_input.addItem(field["name"])
 
         self._my_note_field = QComboBox()
@@ -173,7 +171,6 @@ class MatchRuleForm:
 
         if rule.cousin_field:
             self._other_note_field.setCurrentText(rule.cousin_field)
-            print("loaded cousin field", rule.cousin_field)
 
         if rule.comparison:
             self._matcher.setCurrentIndex(self._matcher.findData(rule.comparison))

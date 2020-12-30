@@ -58,7 +58,8 @@ On linux, with my Anki installation, this can be done by
 
 ```sh
 git clone git@github.com:AlexRiina/anki_cousins.git
-ln -s  `pwd`/src ~/.local/share/Anki2/addons21/beta_cousins
+cd anki_cousins
+make develop
 ```
 
 To avoid overwriting your main settings while working on this plugin, you can

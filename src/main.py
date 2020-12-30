@@ -8,7 +8,6 @@ from anki.consts import (
     QUEUE_TYPE_REV,
     QUEUE_TYPE_SIBLING_BURIED,
 )
-from anki.models import NoteType
 from anki.notes import Note
 from anki.sched import Scheduler
 from anki.schedv2 import Scheduler as SchedulerV2
@@ -25,7 +24,7 @@ if TYPE_CHECKING:
 
 
 def buryCousins(self: SomeScheduler, card: "Card") -> None:
-    """ bury related cards that aren't marked as siblings
+    """bury related cards that aren't marked as siblings
 
     Same as Anki: always delete from current rehearsal and if bury new / bury
     review are set in deck options, bury until tomorrow
@@ -39,8 +38,9 @@ def buryCousins(self: SomeScheduler, card: "Card") -> None:
     my_note = card.note()
 
     def field_value(note, field_name) -> str:
-        note_type = self.col.models.get(note.mid)
-        field_number = self.col.models.fieldMap(note_type)[field_name][0]
+        model = self.col.models.get(note.mid)
+        assert model
+        field_number = self.col.models.fieldMap(model)[field_name][0]
 
         return note.fields[field_number]
 
@@ -188,7 +188,9 @@ def findDupes(
 
     def extract_field(model_id, field_name) -> Iterable[Tuple[int, str]]:
         # type works better in future anki
-        model: NoteType = self.models.get(model_id)
+        model = self.models.get(model_id)
+        assert model  # type is optional, but None should never come back
+
         note_ids = self.findNotes(" ".join(search_filters + [f'note:{model["name"]}']))
 
         field_ord: int = next(
