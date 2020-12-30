@@ -32,7 +32,7 @@ def show_settings_dialog() -> None:
     dialog_layout = QVBoxLayout()
     dialog.setLayout(dialog_layout)
 
-    note_types = list(col.models.models.values())
+    note_types = col.models.all()
 
     append = QPushButton("Add rule")
 
