@@ -23,3 +23,6 @@ test:
 	mypy src
 	python -m doctest src/settings.py
 	black --check .
+
+develop:
+	ln -s ${PWD}/src ~/.local/share/Anki2/addons21/$$(basename ${PWD})_develop
