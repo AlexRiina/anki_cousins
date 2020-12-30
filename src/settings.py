@@ -204,7 +204,7 @@ def _contains(a: List[str], b: List[str], threshold: float):
 
 
 class _cloze_contained_by:
-    """ terms in cloze deletion a contained anywhere in b
+    """terms in cloze deletion a contained anywhere in b
 
     >>> bool(_cloze_contained_by()(['{{c1::hello}}'], ['test hello test'], 1))
     True
