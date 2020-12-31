@@ -86,5 +86,5 @@ The manual testing checklist is:
         - `("Basic front 1", "1")`
         - `("Basic front 2", "2")`
         - `("3", "3")`
-  1.  add a rule to suppress Basic cards when rehearsing a Basic card when the Front side is the same
-  1. review deck and confirm that the rehearsing suppresses card
+    1. add a rule to suppress Basic cards when rehearsing a Basic card when the Front side is the similar (threshold 0.80)
+    1. review deck and confirm that the rehearsing suppresses card
