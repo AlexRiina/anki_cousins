@@ -68,12 +68,21 @@ class SettingsManager:
         self.col = col
 
     def load(self) -> List[MatchRule]:
-        return [
-            self._deserialize_rule(row) for row in self.col.get_config(self.key, [])
-        ]
+        try:
+            config = self.col.get_config(self.key, [])
+        except AttributeError:
+            # Compatibility with Anki<2.1.24
+            config = self.col.conf.get(self.key, [])
+        return [self._deserialize_rule(row) for row in config]
 
     def save(self, match_rules: Iterable[MatchRule]):
-        self.col.set_config(
+        try:
+            set_config = self.col.set_config()
+        except AttributeError:
+            # Compatibility with Anki<2.1.24
+            set_config = self.col.conf.__setitem__
+
+        set_config(
             self.key,
             sorted(
                 [
