@@ -4,7 +4,19 @@ import re
 from collections import defaultdict
 from functools import lru_cache, wraps
 from itertools import product
-from typing import Callable, Dict, Iterable, List, NamedTuple, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    NamedTuple,
+    Tuple,
+    Union,
+)
+
+if TYPE_CHECKING:
+    from anki.collection import _Collection as Collection
 
 Serializeable = Union[int, str, float]
 CLOZE_EXTRACT = re.compile(r"{{(?P<group>.*?)::(?P<answer>.*?)(::.*?)?}}")
@@ -64,7 +76,7 @@ def _one_by_one(
 class SettingsManager:
     key = "anki_cousins"
 
-    def __init__(self, col):
+    def __init__(self, col: "Collection"):
         self.col = col
 
     def load(self) -> List[MatchRule]:
@@ -73,11 +85,12 @@ class SettingsManager:
         except AttributeError:
             # Compatibility with Anki<2.1.24
             config = self.col.conf.get(self.key, [])
+
         return [self._deserialize_rule(row) for row in config]
 
     def save(self, match_rules: Iterable[MatchRule]):
         try:
-            set_config = self.col.set_config()
+            set_config = self.col.set_config
         except AttributeError:
             # Compatibility with Anki<2.1.24
             set_config = self.col.conf.__setitem__
@@ -91,6 +104,8 @@ class SettingsManager:
                 ]
             ),
         )
+
+        self.col.setMod()  # Compatibility with Anki<2.1.24
 
     @staticmethod
     def _deserialize_rule(stored: List[Serializeable]) -> MatchRule:
@@ -124,6 +139,7 @@ def _commonPrefixTest(
     # sort both lists by length
 
     results = []
+
     for a in list_a:
         for b in list_b:
             for i, (al, bl) in enumerate(zip(a, b)):
@@ -168,6 +184,7 @@ class _similarity_test:
                 x_ = _similarity_test._preprocess(x)
 
                 # don't accidentally run on empty cards. rather be safe
+
                 if len(x_) >= 4:
                     mapping[x_].append(x)
 
