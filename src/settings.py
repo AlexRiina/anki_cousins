@@ -105,6 +105,8 @@ class SettingsManager:
             ),
         )
 
+        self.col.setMod()  # Compatibility with Anki<2.1.24
+
     @staticmethod
     def _deserialize_rule(stored: List[Serializeable]) -> MatchRule:
         rule_dict = dict(zip(MatchRule._fields, stored))
