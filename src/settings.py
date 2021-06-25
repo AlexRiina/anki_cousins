@@ -246,6 +246,9 @@ class _cloze_contained_by:
 
     >>> bool(_cloze_contained_by()(['Phase {{c1::2::#N}} clinical trial'], ['2 x 2'], 1))
     False
+
+    >>> bool(_cloze_contained_by()(['{{c1::hello}}'], ['phelloderm'], 1))
+    False
     """
 
     @staticmethod
