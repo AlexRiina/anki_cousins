@@ -93,7 +93,7 @@ class SettingsManager:
             set_config = self.col.set_config
         except AttributeError:
             # Compatibility with Anki<2.1.24
-            set_config = self.col.conf.__setitem__
+            set_config = self.col.conf.__setitem__  # type: ignore
 
         set_config(
             self.key,
