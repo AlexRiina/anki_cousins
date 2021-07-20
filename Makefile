@@ -9,7 +9,7 @@ plugin.zip:
 	unzip -l plugin.zip 'main.py'
 
 clean:
-	rm -r build dist **/*.egg-info plugin.zip || true
+	- rm -r build dist **/*.egg-info plugin.zip
 	pyclean .
 
 build:
