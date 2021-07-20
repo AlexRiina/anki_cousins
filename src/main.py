@@ -98,7 +98,10 @@ def buryCousins(self: SomeScheduler, card: "Card") -> None:
     self.newCount -= len(count_adjustments[QUEUE_TYPE_NEW])
 
     if cousin_cards:
-        tooltip("burying %d cousin card" % len(cousin_cards))
+        tooltip(
+            "burying %d cousin card%s"
+            % (len(cousin_cards), "s" if len(cousin_cards) > 1 else "")
+        )
 
     card_ids_to_bury = [
         id

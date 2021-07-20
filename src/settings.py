@@ -93,7 +93,7 @@ class SettingsManager:
             set_config = self.col.set_config
         except AttributeError:
             # Compatibility with Anki<2.1.24
-            set_config = self.col.conf.__setitem__
+            set_config = self.col.conf.__setitem__  # type: ignore
 
         set_config(
             self.key,
@@ -245,6 +245,9 @@ class _cloze_contained_by:
     False
 
     >>> bool(_cloze_contained_by()(['Phase {{c1::2::#N}} clinical trial'], ['2 x 2'], 1))
+    False
+
+    >>> bool(_cloze_contained_by()(['{{c1::hello}}'], ['phelloderm'], 1))
     False
     """
 
