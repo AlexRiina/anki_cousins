@@ -2,6 +2,9 @@ Anki plugin to bury related cards even if they're not siblings. Configure rules
 so you can suppress similar cards from different notes. These rules can are
 also used in identifying duplicate cards in the card browser.
 
+*NOTE*: this plugin will no longer work with the Anki V3 scheduler which is
+currently in Beta.
+
 # Configuring Rules
 
 To configure, go to "Tools" > "Add-Ons" and select the "Bury Cousins" plugin
